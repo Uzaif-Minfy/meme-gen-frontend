@@ -2,14 +2,15 @@ name: stop instance and container
 
 on:
   schedule:
-    - cron: '30 5 * * 1-5' 
-  workflow_dispatch:
+    - cron: '30 5 * * 1-5'  # 11:00 AM IST (UTC+5:30)
+  workflow_dispatch:        # Allow manual run too
 
 jobs:
   stop:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Get Public IP of EC2
+      - name: Get EC2 public IP
         id: get_ip
         run: |
           IP=$(aws ec2 describe-instances \
@@ -23,20 +24,28 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Stop Docker Container
+      - name: Wait for SSH port (22) to be ready
+        run: |
+          for i in {1..10}; do
+            nc -zv ${{ steps.get_ip.outputs.ec2_ip }} 22 && break
+            echo "Waiting for SSH on port 22..."
+            sleep 10
+          done
+
+      - name: Stop Docker container
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ steps.get_ip.outputs.ec2_ip }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            docker ps --format '{{.Names}}' | grep -q '^my_container_name$' && \
-              docker stop my_container_name || \
-              echo "Container not running"
+            docker ps --format '{{.Names}}' | grep -q '^meme-gen-frontend$' && \
+              docker stop meme-gen-frontend || \
+              echo "Container already stopped or not found"
 
-      - name: Stop EC2 Instance
+      - name: Stop EC2 instance
         run: |
-          aws ec2 stop-instances --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ${{ secrets.AWS_REGION }} > /dev/null
+          aws ec2 stop-instances --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ${{ secrets.AWS_REGION }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
