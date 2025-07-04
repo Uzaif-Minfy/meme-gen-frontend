@@ -1,23 +1,23 @@
-name: Start instance and Container
+name: start instance and cocker
 
 on:
   schedule:
-    - cron: '30 4 * * 1-5'
+    - cron: '30 4 * * 1-5' 
   workflow_dispatch:
 
 jobs:
   start:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Start EC2 Instance
-        id: ec2_start
+      - name: Start EC2
         run: |
-          aws ec2 start-instances --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ${{ secrets.AWS_REGION }} > /dev/null
+          aws ec2 start-instances --instance-ids ${{ secrets.EC2_INSTANCE_ID }} --region ${{ secrets.AWS_REGION }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Wait for EC2 to be Running
+      - name: Wait for EC2 to be in running state
         run: |
           for i in {1..30}; do
             state=$(aws ec2 describe-instances \
@@ -25,7 +25,7 @@ jobs:
               --region ${{ secrets.AWS_REGION }} \
               --query "Reservations[0].Instances[0].State.Name" \
               --output text)
-            echo "Current state: $state"
+            echo "EC2 state: $state"
             if [ "$state" = "running" ]; then break; fi
             sleep 10
           done
@@ -47,7 +47,15 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Start Docker Container
+      - name: Wait for SSH port (22) to be ready
+        run: |
+          for i in {1..10}; do
+            nc -zv ${{ steps.get_ip.outputs.ec2_ip }} 22 && break
+            echo "Waiting for SSH..."
+            sleep 10
+          done
+
+      - name: Start Docker container
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ steps.get_ip.outputs.ec2_ip }}
