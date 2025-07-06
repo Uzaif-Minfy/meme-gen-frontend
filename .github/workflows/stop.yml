@@ -28,15 +28,6 @@ jobs:
             --output text)
           echo "::add-mask::$IP"
           echo "ec2_ip=$IP" >> "$GITHUB_OUTPUT"
-    
-
-      # - name: Wait for SSH port (22) to be ready
-      #   run: |
-      #     for i in {1..10}; do
-      #       nc -zv ${{ steps.get_ip.outputs.ec2_ip }} 22 && break
-      #       echo "Waiting for SSH on port 22..."
-      #       sleep 10
-      #     done
 
 
       - name: Stop Docker container
